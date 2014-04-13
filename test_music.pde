@@ -17,6 +17,7 @@ int focusRelaxLevel = 0;
 IntList levelHist = new IntList();
 int MAX_FOCUS = 100;
 int MAX_RELAX = -100;
+int level = 0;
 
 // BPM - Beats per minute, tempo, corresponds to pulse (average over X measures)
 int pulse = 60;
@@ -145,9 +146,13 @@ void setupMusic() {
 	hat = new RiriSequence(channel3);
 	bass = new RiriSequence(channel4);
 	arp = new RiriSequence(channel5);
+	createRestMeasure(arp);
 	pad = new RiriSequence(channel6);
+	createRestMeasure(pad);
 	// Start all instruments
 	kick.start();
+	arp.start();
+	pad.start();
 	// Start playing the song
 	playing = true;
 }
@@ -204,14 +209,125 @@ void stopMusic() {
 }
 
 void createMeasure() {
+	// Kick drum
 	createKickMeasure();
+	// Arp
+	createArpMeasure();
+	// Pad
+	createPadMeasure();
+}
+
+void createRestMeasure(RiriSequence seq) {
+	seq.addRest(beatsToMils(BEATS_PER_MEASURE));
 }
 
 void createKickMeasure() {
 	kick.addNote(36, 100, beatsToMils(1));
-	kick.addNote(36, 80, beatsToMils(1));
-	kick.addNote(36, 80, beatsToMils(1));
-	kick.addNote(36, 80, beatsToMils(1));
+	for (int i = 0; i < BEATS_PER_MEASURE - 1; i++) {
+		kick.addNote(36, 80, beatsToMils(1));
+	}
+}
+
+void createArpMeasure() {
+	// If Relax is active, play the Arp
+	if (level <= 0) {
+		int interval = beatsToMils(beats[grain]);
+		for (int i = 0; i < BEATS_PER_MEASURE / beats[grain]; i++) {
+				int p1 = pitch + scale[(int) random(0, scale.length)];
+				arp.addNote(p1, 80, interval);
+			} 
+		/*
+		// Arp - Grain 0
+		if (grain == 0) {
+			for (int i = 0; i < BEATS_PER_MEASURE; i++) {
+				int p1 = pitch + scale[(int) random(0, scale.length)];
+				arp.addNote(p1, 80, interval);
+			} 
+		}
+		// Arp - Grain 1
+		else if (grain == 1) {
+			for (int i = 0; i < BEATS_PER_MEASURE * 2; i++) {
+				int p1 = pitch + scale[(int) random(0, scale.length)];
+				arp.addNote(p1, 80, interval);
+			} 
+		}
+		// Arp - Grain 2
+		else if (grain == 2) {
+			for (int i = 0; i < BEATS_PER_MEASURE * 4; i++) {
+				int p1 = pitch + scale[(int) random(0, scale.length)];
+				arp.addNote(p1, 80, interval);
+			} 
+		}
+		// Arp - Grain 3
+		else {
+			for (int i = 0; i < BEATS_PER_MEASURE * 8; i++) {
+				int p1 = pitch + scale[(int) random(0, scale.length)];
+				arp.addNote(p1, 80, interval);
+			} 
+		}
+		*/
+	}
+	// If not, rest
+	else {
+		createRestMeasure(arp);
+	}
+}
+
+void createPadMeasure() {
+	// If Relax is active, play the pad
+	if (level <= 0) {
+		// Pad - Grain 0 and Grain 1
+		if (grain <= 1) {
+			int p1 = pitch - 12;
+			int p2 = pitch + scale[(int) random(1, scale.length)] - 12;
+			RiriChord c1 = new RiriChord(channel6);
+			c1.addNote(p1, 80, beatsToMils(beats[0]*4));
+			c1.addNote(p2, 80, beatsToMils(beats[0]*4));
+			pad.addChord(c1);
+		}
+		// Pad - Grain 2
+		else if (grain == 2) {
+			int p1 = pitch - 12;
+			int p2 = pitch + scale[(int) random(1, scale.length)] - 12;
+			RiriChord c1 = new RiriChord(channel6);
+			c1.addNote(p1, 80, beatsToMils(beats[1]*4));
+			c1.addNote(p2, 80, beatsToMils(beats[1]*4));
+			p2 = pitch + scale[(int) random(1, scale.length)] - 12;
+			RiriChord c2 = new RiriChord(channel6);
+			c2.addNote(p1, 80, beatsToMils(beats[1]*4));
+			c2.addNote(p2, 80, beatsToMils(beats[1]*4));
+			pad.addChord(c1);
+			pad.addChord(c2);
+		}
+		// Pad - Grain 3
+		else {
+			int p1 = pitch - 12;
+			int p2 = pitch + scale[(int) random(1, scale.length)] - 12;
+			RiriChord c1 = new RiriChord(channel6);
+			c1.addNote(p1, 80, beatsToMils(beats[2]*4));
+			c1.addNote(p2, 80, beatsToMils(beats[2]*4));
+			p2 = pitch + scale[(int) random(1, scale.length)] - 12;
+			RiriChord c2 = new RiriChord(channel6);
+			c2.addNote(p1, 80, beatsToMils(beats[2]*4));
+			c2.addNote(p2, 80, beatsToMils(beats[2]*4));
+			p2 = pitch + scale[(int) random(1, scale.length)] - 12;
+			RiriChord c3 = new RiriChord(channel6);
+			c3.addNote(p1, 80, beatsToMils(beats[2]*4));
+			c3.addNote(p2, 80, beatsToMils(beats[2]*4));
+			p2 = pitch + scale[(int) random(1, scale.length)] - 12;
+			RiriChord c4 = new RiriChord(channel6);
+			c4.addNote(p1, 80, beatsToMils(beats[2]*4));
+			c4.addNote(p2, 80, beatsToMils(beats[2]*4));
+			pad.addChord(c1);
+			pad.addChord(c2);
+			pad.addChord(c3);
+			pad.addChord(c4);
+		}
+	}
+	// If not, rest
+	else {
+		createRestMeasure(pad);
+	}
 }
 
 /*
@@ -257,9 +373,10 @@ void setMeasureGrain() {
 		val += levelHist.get(i);
 	}
 	val = val/levelHist.size();
-	val = abs(val);
-	//int val = abs(focusRelaxLevel);
+	// Set level
+	level = (int) val;
 	// Set the grain
+	val = abs(val);
 	if (val < 20) {
 		grain = 0;
 	}
