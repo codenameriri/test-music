@@ -14,16 +14,19 @@ boolean playing = false;
 
 // Focus/Relax Level - Focus is positive (1 to 100), Relax is negative (-1 to -100)
 int focusRelaxLevel = 0;
+IntList levelHist = new IntList();
 int MAX_FOCUS = 100;
 int MAX_RELAX = -100;
+
+// BPM - Beats per minute, corresponds to pulse (average over X measures)
+int pulse = 60;
+IntList pulseHist = new IntList();
 
 // Grain - "Frequency" of notes, 0 = 1/4 notes, 1 = 1/8 notes, 2 = 1/16 notes, 3 = 1/32 notes
 // Corresponds to Focus/Relax Level (0 = 0 to 20, 1 = 20 to 50, 2 = 50 to 80, 3 = 80 to 100)
 int grain = 0;
+//IntList grainHist = new IntList();
 float[] beats = {1, 0.5, 0.25, 0.125};
-
-// BPM - Beats per minute, corresponds to pulse (average over X measures)
-int bpm = 60;
 
 // Timekeeping
 int phase = 1;
@@ -34,6 +37,7 @@ int beat = 0;
 int BEATS_PER_MEASURE = 4;
 int mils = millis();
 int lastMils = mils;
+int BPM = pulse;
 
 // Music Stuff
 int[] scale = {0, 2, 4, 7, 9};
@@ -82,12 +86,13 @@ void draw() {
 	background(0);
 	// Debug
 	text("Focus/Relax: "+focusRelaxLevel, 0, HEIGHT - 15, WIDTH, HEIGHT);
-	text("BPM: "+bpm, WIDTH/4, HEIGHT - 15, WIDTH, HEIGHT);
+	text("Pulse: "+pulse, WIDTH/4, HEIGHT - 15, WIDTH, HEIGHT);
 	text("Beat: "+beat, 0, HEIGHT/2, WIDTH, HEIGHT);
 	text("Measure: "+measure, 0, HEIGHT/2 + 15, WIDTH, HEIGHT);
 	text("Phase: "+phase, 0, HEIGHT/2 + 30, WIDTH, HEIGHT);
 	text("Grain: "+grain, WIDTH/4, HEIGHT/2, WIDTH, HEIGHT);
-	text("Pitch: "+pitch, WIDTH/4, HEIGHT/2 + 15, WIDTH, HEIGHT);
+	text("BPM: "+BPM, WIDTH/4, HEIGHT/2 + 15, WIDTH, HEIGHT);
+	text("Pitch: "+pitch, WIDTH/4, HEIGHT/2 + 30, WIDTH, HEIGHT);
 	// Play Music
 	if (playing) {
 		playMusic();
@@ -113,10 +118,10 @@ void keyPressed() {
 			addRelax(5);
 			break;
 		case 'w':
-			upHeartRate(5);
+			upPulse(5);
 			break;
 		case 's':
-			downHeartRate(5);
+			downPulse(5);
 			break;
 		default:
 			break;
@@ -128,10 +133,19 @@ void keyPressed() {
 */
 
 void setupMusic() {
+	// Reset song position
 	beat = 0;
-	measure = 1;
+	measure = 0;
 	phase = 1;
 	setPhaseKey();
+	// Setup the instruments
+	kick = new RiriSequence(channel1);
+	snare = new RiriSequence(channel2);
+	hat = new RiriSequence(channel3);
+	bass = new RiriSequence(channel4);
+	arp = new RiriSequence(channel5);
+	pad = new RiriSequence(channel6);
+	// Start playing the song
 	playing = true;
 }
 
@@ -140,10 +154,13 @@ void playMusic() {
 	mils = millis();
 	// Beat Change
 	if (mils > lastMils + beatsToMils(1)) {
+		updateLevelHistory();
+		updateBpmHistory();
 		if (beat == BEATS_PER_MEASURE) {
 			beat = 1;
 			// Measure Change
-			setGrain();
+			setMeasureGrain();
+			setMeasureBPM();
 			if (measure == MEASURES_PER_PHASE) {
 				measure = 1;
 				if (phase == PHASES_PER_SONG) {
@@ -176,12 +193,14 @@ void stopMusic() {
 *	Utils
 */
 
+// Get the length of a beat in milliseconds
 int beatsToMils(float beats){
   // (one second split into single beats) * # needed
-  float convertedNumber = (60000 / bpm) * beats;
+  float convertedNumber = (60000 / BPM) * beats;
   return (int) convertedNumber;
 }
 
+// Adjust the Focus and Relax values
 void addFocus(int i) {
 	focusRelaxLevel += i;
 	if (focusRelaxLevel > MAX_FOCUS) {
@@ -196,16 +215,26 @@ void addRelax(int i) {
 	}
 }
 
-void upHeartRate(int i) {
-	bpm += i;
+// Adjust the pulse value
+void upPulse(int i) {
+	pulse += i;
 }
 
-void downHeartRate(int i) {
-	bpm -= i;
+void downPulse(int i) {
+	pulse -= i;
 }
 
-void setGrain() {
-	int val = abs(focusRelaxLevel);
+// Set the grain for the current measure
+void setMeasureGrain() {
+	// Get the average focusRelaxLevel
+	float val = 0;
+	for (int i = 0; i < levelHist.size(); i++) {
+		val += levelHist.get(i);
+	}
+	val = val/levelHist.size();
+	val = abs(val);
+	//int val = abs(focusRelaxLevel);
+	// Set the grain
 	if (val < 20) {
 		grain = 0;
 	}
@@ -223,10 +252,28 @@ void setGrain() {
 	}
 }
 
+// Get the beat length of the current grain
 float grainToBeat() {
 	return beats[grain];
 }
 
+// Get the millisecond length of the current grain
+int grainToMillis() {
+	return beatsToMils(grainToBeat());
+}
+
+// Set the BPM for the next measure
+void setMeasureBPM() {
+	// Get the average BPM
+	float val = 0; 
+	for (int i = 0; i < pulseHist.size(); i++) {
+		val += pulseHist.get(i);
+	}
+	val = val/pulseHist.size();
+	BPM = (int) val;
+}
+
+// Set the key for the next phase
 void setPhaseKey() {
 	if (phase == 1 || phase == 4) {
 		pitch = PITCH_C;
@@ -238,3 +285,26 @@ void setPhaseKey() {
 		pitch = PITCH_G;
 	}
 }
+
+// Save the focusRelaxLevel to the history
+void updateLevelHistory() {
+	if (levelHist.size() == 4) {
+		levelHist.remove(0);
+	}
+	levelHist.append(focusRelaxLevel);
+}
+
+// Save the pulse to the history
+void updateBpmHistory() {
+	if (pulseHist.size() == 4) {
+		pulseHist.remove(0);
+	}
+	pulseHist.append(pulse);
+}
+
+/*void updateGrainHistory() {
+	if (grainHist.size() == 4) {
+		grainHist.remove(0);
+	}
+	grainHist.append(grain);
+}*/
