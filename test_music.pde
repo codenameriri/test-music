@@ -18,9 +18,10 @@ IntList levelHist = new IntList();
 int MAX_FOCUS = 100;
 int MAX_RELAX = -100;
 
-// BPM - Beats per minute, corresponds to pulse (average over X measures)
+// BPM - Beats per minute, tempo, corresponds to pulse (average over X measures)
 int pulse = 60;
 IntList pulseHist = new IntList();
+int bpm = pulse;
 
 // Grain - "Frequency" of notes, 0 = 1/4 notes, 1 = 1/8 notes, 2 = 1/16 notes, 3 = 1/32 notes
 // Corresponds to Focus/Relax Level (0 = 0 to 20, 1 = 20 to 50, 2 = 50 to 80, 3 = 80 to 100)
@@ -37,7 +38,6 @@ int beat = 0;
 int BEATS_PER_MEASURE = 4;
 int mils = millis();
 int lastMils = mils;
-int BPM = pulse;
 
 // Music Stuff
 int[] scale = {0, 2, 4, 7, 9};
@@ -91,7 +91,7 @@ void draw() {
 	text("Measure: "+measure, 0, HEIGHT/2 + 15, WIDTH, HEIGHT);
 	text("Phase: "+phase, 0, HEIGHT/2 + 30, WIDTH, HEIGHT);
 	text("Grain: "+grain, WIDTH/4, HEIGHT/2, WIDTH, HEIGHT);
-	text("BPM: "+BPM, WIDTH/4, HEIGHT/2 + 15, WIDTH, HEIGHT);
+	text("BPM: "+bpm, WIDTH/4, HEIGHT/2 + 15, WIDTH, HEIGHT);
 	text("Pitch: "+pitch, WIDTH/4, HEIGHT/2 + 30, WIDTH, HEIGHT);
 	// Play Music
 	if (playing) {
@@ -140,11 +140,14 @@ void setupMusic() {
 	setPhaseKey();
 	// Setup the instruments
 	kick = new RiriSequence(channel1);
+	createKickMeasure();
 	snare = new RiriSequence(channel2);
 	hat = new RiriSequence(channel3);
 	bass = new RiriSequence(channel4);
 	arp = new RiriSequence(channel5);
 	pad = new RiriSequence(channel6);
+	// Start all instruments
+	kick.start();
 	// Start playing the song
 	playing = true;
 }
@@ -159,8 +162,6 @@ void playMusic() {
 		if (beat == BEATS_PER_MEASURE) {
 			beat = 1;
 			// Measure Change
-			setMeasureGrain();
-			setMeasureBPM();
 			if (measure == MEASURES_PER_PHASE) {
 				measure = 1;
 				if (phase == PHASES_PER_SONG) {
@@ -170,23 +171,47 @@ void playMusic() {
 				else {
 					phase++;
 				}
-				// Phase Change
+			}
+			else if (measure == MEASURES_PER_PHASE - 1) {
+				// Prepare for the next phase
 				setPhaseKey();
+				measure++;
 			}
 			else {
 				measure++;
 			}
 		}
+		else if (beat == BEATS_PER_MEASURE - 1) {
+			// Prepare the next measure
+			setMeasureGrain();
+			setMeasureBPM();
+			createMeasure();
+			beat++;
+		}
 		else {
 			beat++;
 		}
 		// Update the time
-		lastMils = mils;
+		lastMils = millis();
 	}
 }
 
 void stopMusic() {
+	// Stop all instruments
+	kick.quit();
+	// Stop playing the song
 	playing = false;
+}
+
+void createMeasure() {
+	createKickMeasure();
+}
+
+void createKickMeasure() {
+	kick.addNote(36, 100, beatsToMils(1));
+	kick.addNote(36, 80, beatsToMils(1));
+	kick.addNote(36, 80, beatsToMils(1));
+	kick.addNote(36, 80, beatsToMils(1));
 }
 
 /*
@@ -196,7 +221,7 @@ void stopMusic() {
 // Get the length of a beat in milliseconds
 int beatsToMils(float beats){
   // (one second split into single beats) * # needed
-  float convertedNumber = (60000 / BPM) * beats;
+  float convertedNumber = (60000 / bpm) * beats;
   return (int) convertedNumber;
 }
 
@@ -270,7 +295,7 @@ void setMeasureBPM() {
 		val += pulseHist.get(i);
 	}
 	val = val/pulseHist.size();
-	BPM = (int) val;
+	bpm = (int) val;
 }
 
 // Set the key for the next phase
@@ -302,9 +327,11 @@ void updateBpmHistory() {
 	pulseHist.append(pulse);
 }
 
-/*void updateGrainHistory() {
+/*
+void updateGrainHistory() {
 	if (grainHist.size() == 4) {
 		grainHist.remove(0);
 	}
 	grainHist.append(grain);
-}*/
+}
+*/
