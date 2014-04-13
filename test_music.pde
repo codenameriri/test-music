@@ -20,12 +20,10 @@ int MAX_RELAX = -100;
 // Grain - "Frequency" of notes, 0 = 1/4 notes, 1 = 1/8 notes, 2 = 1/16 notes, 3 = 1/32 notes
 // Corresponds to Focus/Relax Level (0 = 0 to 20, 1 = 20 to 50, 2 = 50 to 80, 3 = 80 to 100)
 int grain = 0;
-int GRAIN = grain;
 float[] beats = {1, 0.5, 0.25, 0.125};
 
 // BPM - Beats per minute, corresponds to pulse (average over X measures)
 int bpm = 60;
-int BPM = bpm;
 
 // Timekeeping
 int phase = 1;
@@ -42,6 +40,7 @@ int[] scale = {0, 2, 4, 7, 9};
 int PITCH_C = 60;
 int PITCH_F = 65;
 int PITCH_G = 67;
+int pitch = PITCH_C;
 
 // MidiBus
 MidiBus mb;
@@ -83,10 +82,12 @@ void draw() {
 	background(0);
 	// Debug
 	text("Focus/Relax: "+focusRelaxLevel, 0, HEIGHT - 15, WIDTH, HEIGHT);
-	text("BPM: "+BPM, WIDTH/4, HEIGHT - 15, WIDTH, HEIGHT);
+	text("BPM: "+bpm, WIDTH/4, HEIGHT - 15, WIDTH, HEIGHT);
 	text("Beat: "+beat, 0, HEIGHT/2, WIDTH, HEIGHT);
 	text("Measure: "+measure, 0, HEIGHT/2 + 15, WIDTH, HEIGHT);
 	text("Phase: "+phase, 0, HEIGHT/2 + 30, WIDTH, HEIGHT);
+	text("Grain: "+grain, WIDTH/4, HEIGHT/2, WIDTH, HEIGHT);
+	text("Pitch: "+pitch, WIDTH/4, HEIGHT/2 + 15, WIDTH, HEIGHT);
 	// Play Music
 	if (playing) {
 		playMusic();
@@ -130,19 +131,21 @@ void setupMusic() {
 	beat = 0;
 	measure = 1;
 	phase = 1;
+	setPhaseKey();
 	playing = true;
 }
 
 void playMusic() {
+	// Get current time
 	mils = millis();
 	// Beat Change
 	if (mils > lastMils + beatsToMils(1)) {
 		if (beat == BEATS_PER_MEASURE) {
 			beat = 1;
 			// Measure Change
+			setGrain();
 			if (measure == MEASURES_PER_PHASE) {
 				measure = 1;
-				// Phase Change
 				if (phase == PHASES_PER_SONG) {
 					// We're done!
 					stopMusic();
@@ -150,6 +153,8 @@ void playMusic() {
 				else {
 					phase++;
 				}
+				// Phase Change
+				setPhaseKey();
 			}
 			else {
 				measure++;
@@ -158,6 +163,7 @@ void playMusic() {
 		else {
 			beat++;
 		}
+		// Update the time
 		lastMils = mils;
 	}
 }
@@ -172,7 +178,7 @@ void stopMusic() {
 
 int beatsToMils(float beats){
   // (one second split into single beats) * # needed
-  float convertedNumber = (60000 / BPM) * beats;
+  float convertedNumber = (60000 / bpm) * beats;
   return (int) convertedNumber;
 }
 
@@ -191,9 +197,44 @@ void addRelax(int i) {
 }
 
 void upHeartRate(int i) {
-	BPM += i;
+	bpm += i;
 }
 
 void downHeartRate(int i) {
-	BPM -= i;
+	bpm -= i;
+}
+
+void setGrain() {
+	int val = abs(focusRelaxLevel);
+	if (val < 20) {
+		grain = 0;
+	}
+	else if (val >= 20 && val < 50) {
+		grain = 1;
+	}
+	else if (val >= 50 && val < 80) {
+		grain = 2;
+	}
+	else if (val >= 80) {
+		grain = 3;
+	}
+	else {
+		grain = 0; // Iunno
+	}
+}
+
+float grainToBeat() {
+	return beats[grain];
+}
+
+void setPhaseKey() {
+	if (phase == 1 || phase == 4) {
+		pitch = PITCH_C;
+	}
+	else if (phase == 2) {
+		pitch = PITCH_F;
+	}
+	else {
+		pitch = PITCH_G;
+	}
 }
