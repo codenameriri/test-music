@@ -20,7 +20,7 @@ int MAX_RELAX = -100;
 int level = 0;
 
 // BPM - Beats per minute, tempo, corresponds to pulse (average over X measures)
-int pulse = 60;
+int pulse = 80; // 65
 IntList pulseHist = new IntList();
 int bpm = pulse;
 
@@ -34,14 +34,14 @@ float[] beats = {1, 0.5, 0.25, 0.125};
 int phase = 1;
 int PHASES_PER_SONG = 4;
 int measure = 1;
-int MEASURES_PER_PHASE = 8;
+int MEASURES_PER_PHASE = 2; //8
 int beat = 0;
 int BEATS_PER_MEASURE = 4;
 int mils = millis();
 int lastMils = mils;
 
 // Music Stuff
-int[] scale = {0, 2, 4, 7, 9};
+int[] scale = {0, 2, 4, 7, 9}; // I, II, III, V, VI
 int PITCH_C = 60;
 int PITCH_F = 65;
 int PITCH_G = 67;
@@ -124,6 +124,20 @@ void keyPressed() {
 		case 's':
 			downPulse(5);
 			break;
+		case '1':
+			// Test MIDI Mapping
+			mb.sendNoteOn(channel6, 0, 80);
+			mb.sendNoteOff(channel6, 0, 80);
+			println("TEST");
+			break;
+		case '2':
+			// Test Tempo change
+			mb.sendNoteOn(6, 0, 80);
+			mb.sendNoteOff(6, 0, 80);
+			mb.sendNoteOn(7, 127, 80);
+			mb.sendNoteOff(7, 127, 80);
+			println("TEMPO");
+			break;
 		default:
 			break;
 	}
@@ -140,14 +154,9 @@ void setupMusic() {
 	phase = 1;
 	setPhaseKey();
 	// Setup the instruments
-	kick = new RiriSequence(channel1);
+	createInstrumentsBeforePhase();
 	createKickMeasure();
-	snare = new RiriSequence(channel2);
-	hat = new RiriSequence(channel3);
-	bass = new RiriSequence(channel4);
-	arp = new RiriSequence(channel5);
 	createRestMeasure(arp);
-	pad = new RiriSequence(channel6);
 	createRestMeasure(pad);
 	// Start all instruments
 	kick.start();
@@ -179,6 +188,7 @@ void playMusic() {
 			}
 			else if (measure == MEASURES_PER_PHASE - 1) {
 				// Prepare for the next phase
+				// createInstrumentsBeforePhase();
 				setPhaseKey();
 				measure++;
 			}
@@ -217,6 +227,15 @@ void createMeasure() {
 	createPadMeasure();
 }
 
+void createInstrumentsBeforePhase() {
+	kick = new RiriSequence(channel1);
+	snare = new RiriSequence(channel2);
+	hat = new RiriSequence(channel3);
+	bass = new RiriSequence(channel4);
+	arp = new RiriSequence(channel5);
+	pad = new RiriSequence(channel6);
+}
+
 void createRestMeasure(RiriSequence seq) {
 	seq.addRest(beatsToMils(BEATS_PER_MEASURE));
 }
@@ -232,13 +251,49 @@ void createArpMeasure() {
 	// If Relax is active, play the Arp
 	if (level <= 0) {
 		int interval = beatsToMils(beats[grain]);
-		for (int i = 0; i < BEATS_PER_MEASURE / beats[grain]; i++) {
+		/*for (int i = 0; i < BEATS_PER_MEASURE / beats[grain]; i++) {
+			int p1 = pitch + scale[(int) random(0, scale.length)];
+			arp.addNote(p1, 80, interval);
+		}*/ 
+
+		// Arp - Grain 0
+		if (grain == 0) {
+			// Random notes
+			for (int i = 0; i < BEATS_PER_MEASURE; i++) {
 				int p1 = pitch + scale[(int) random(0, scale.length)];
 				arp.addNote(p1, 80, interval);
 			} 
+		}
+		// Arp - Grain 1 or higher
+		else {
+			int[] arpNotes;
+			int count = 0;
+			if (grain == 1) {
+				// Arpeggiate between I, III, V, and VIII
+				int[] tmp = {pitch, pitch + scale[2], pitch + scale[4], pitch + 12};
+				arpNotes = tmp;
+			}
+			else if (grain == 2) {
+				// Arpeggiate between I, III, V, VI and VIII
+				int[] tmp = {pitch, pitch + scale[2], pitch + scale[3], pitch + scale[4], pitch + 12};
+				arpNotes = tmp;
+			}
+			else {
+				// Arpeggiate between I, II, III, V, VI and VIII
+				int[] tmp = {pitch, pitch + scale[1], pitch + scale[2], pitch + scale[3], pitch + scale[4], pitch + 12};
+				arpNotes = tmp;
+			}
+			// "Up" only arpeggiation
+			for (int i = 0; i < BEATS_PER_MEASURE / beats[grain]; i++) {
+				arp.addNote(arpNotes[count], 80, interval);
+				count = (count == arpNotes.length -1) ? 0 : count + 1;
+			}
+		}
+
 		/*
 		// Arp - Grain 0
 		if (grain == 0) {
+			// Random notes
 			for (int i = 0; i < BEATS_PER_MEASURE; i++) {
 				int p1 = pitch + scale[(int) random(0, scale.length)];
 				arp.addNote(p1, 80, interval);
@@ -246,10 +301,13 @@ void createArpMeasure() {
 		}
 		// Arp - Grain 1
 		else if (grain == 1) {
-			for (int i = 0; i < BEATS_PER_MEASURE * 2; i++) {
-				int p1 = pitch + scale[(int) random(0, scale.length)];
-				arp.addNote(p1, 80, interval);
-			} 
+			// Arpeggiate between I, III, V, and VIII
+			int[] arpNotes = {pitch, pitch + scale[3], pitch + scale[4], pitch + 12};
+			for (int i = 0; i < 2; i++) {
+				for (int j = 0; j < arpNotes.length; j++) {
+					arp.addNote(arpNotes[j], 80, interval)
+				}
+			}
 		}
 		// Arp - Grain 2
 		else if (grain == 2) {
@@ -417,10 +475,11 @@ void setMeasureBPM() {
 
 // Set the key for the next phase
 void setPhaseKey() {
-	if (phase == 1 || phase == 4) {
+	int p = phase - 1;
+	if (p == 0 || p == PHASES_PER_SONG - 1) {
 		pitch = PITCH_C;
 	}
-	else if (phase == 2) {
+	else if (p == PHASES_PER_SONG - 2) {
 		pitch = PITCH_F;
 	}
 	else {
