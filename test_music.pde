@@ -34,7 +34,7 @@ float[] beats = {1, 0.5, 0.25, 0.125};
 int phase = 1;
 int PHASES_PER_SONG = 4;
 int measure = 1;
-int MEASURES_PER_PHASE = 2; //8
+int MEASURES_PER_PHASE = 4; //8
 int beat = 0;
 int BEATS_PER_MEASURE = 4;
 int mils = millis();
@@ -156,10 +156,16 @@ void setupMusic() {
 	// Setup the instruments
 	createInstrumentsBeforePhase();
 	createKickMeasure();
+	createRestMeasure(snare);
+	createRestMeasure(hat);
+	createRestMeasure(bass);
 	createRestMeasure(arp);
 	createRestMeasure(pad);
 	// Start all instruments
 	kick.start();
+	snare.start();
+	hat.start();
+	bass.start();
 	arp.start();
 	pad.start();
 	// Start playing the song
@@ -214,6 +220,11 @@ void playMusic() {
 void stopMusic() {
 	// Stop all instruments
 	kick.quit();
+	snare.quit();
+	hat.quit();
+	bass.quit();
+	arp.quit();
+	pad.quit();
 	// Stop playing the song
 	playing = false;
 }
@@ -221,6 +232,12 @@ void stopMusic() {
 void createMeasure() {
 	// Kick drum
 	createKickMeasure();
+	// Snare drum
+	createSnareMeasure();
+	// Hat
+	createHatMeasure();
+	// Bass
+	createBassMeasure();
 	// Arp
 	createArpMeasure();
 	// Pad
@@ -241,9 +258,135 @@ void createRestMeasure(RiriSequence seq) {
 }
 
 void createKickMeasure() {
-	kick.addNote(36, 100, beatsToMils(1));
+	kick.addNote(36, 120, beatsToMils(1));
 	for (int i = 0; i < BEATS_PER_MEASURE - 1; i++) {
-		kick.addNote(36, 80, beatsToMils(1));
+		kick.addNote(36, 120, beatsToMils(1));
+	}
+}
+
+void createSnareMeasure() {
+	// If focus is active 
+	if (level >= 0) {
+		// Snare - Grain 0
+		if (grain == 0) {
+			createRestMeasure(snare);
+		}
+		// Snare - Grain 1
+		else if (grain ==1) {
+			// Play a note every other measure
+			for (int i = 0; i < BEATS_PER_MEASURE; i++) {
+				if (i % 2 == 1) {
+					snare.addNote(38, 120, beatsToMils(1));
+				}
+				else {
+					snare.addRest(beatsToMils(1));
+				}
+			}
+		}
+		// Snare - Grain 2
+		else if (grain == 2) {
+			for (int i = 0; i < BEATS_PER_MEASURE / beats[1]; i++) {
+				int r1 = round(random(0,1));
+				if (r1 == 0) {
+					snare.addNote(38, 120, beatsToMils(beats[1]));
+				}
+				else {
+					snare.addRest(beatsToMils(beats[1]));
+				}
+			}
+		}
+		// Snare - Grain 3
+		else {
+			for (int i = 0; i < BEATS_PER_MEASURE / beats[2]; i++) {
+				int r1 = round(random(0,1));
+				if (r1 == 0) {
+					snare.addNote(38, 120, beatsToMils(beats[2]));
+				}
+				else {
+					snare.addRest(beatsToMils(beats[2]));
+				}
+			}
+		}
+	}
+	else {
+		createRestMeasure(snare);
+	}
+}
+
+void createHatMeasure() {
+	int close = 42;
+	int open = 46;
+	// If Focus is active, play the Hat
+	if (level >= 0) {
+		// Hat - Grain 0
+		if (grain == 0) {
+			// Play a closed note every other measure
+			for (int i = 0; i < BEATS_PER_MEASURE; i++) {
+				if (i % 2 == 1) {
+					hat.addNote(close, 120, beatsToMils(1));
+				}
+				else {
+					hat.addRest(beatsToMils(1));
+				}
+			}
+		}
+		// Hat - Grain 1
+		else if (grain == 1) {
+			// Play a closed note every measure, end open
+			for (int i = 0; i < BEATS_PER_MEASURE; i++) {
+				if (i == BEATS_PER_MEASURE - 1) {
+					hat.addNote(close, 120, beatsToMils(.5));
+					hat.addNote(open, 120, beatsToMils(.5));
+				}
+				else {
+					hat.addNote(close, 120, beatsToMils(1));
+				}
+			}
+		}
+		// Hat - Grain 2
+		else if (grain == 2) {
+			for (int i = 0; i < BEATS_PER_MEASURE; i++) {
+				if (i % 2 == 1) {
+					hat.addNote(close, 120, beatsToMils(.25));
+					hat.addNote(close, 80, beatsToMils(.25));
+					hat.addNote(close, 80, beatsToMils(.25));
+					hat.addNote(open, 120, beatsToMils(.25));
+				}
+				else {
+					hat.addNote(close, 120, beatsToMils(.25));
+					hat.addNote(close, 80, beatsToMils(.25));
+					hat.addNote(close, 80, beatsToMils(.25));
+					hat.addNote(close, 80, beatsToMils(.25));
+				}
+			}
+		}
+		// Hat - Grain 3
+		else {
+			for (int i = 0; i < BEATS_PER_MEASURE; i++) {
+				hat.addNote(close, 120, beatsToMils(.25));
+				hat.addNote(close, 80, beatsToMils(.25));
+				hat.addNote(close, 80, beatsToMils(.25));
+				hat.addNote(open, 120, beatsToMils(.25));
+			}
+		}
+	}
+	else {
+		createRestMeasure(hat);
+	}
+}
+
+void createBassMeasure() {
+	// If Focus is active, play the Bass
+	if (level >= 0) {
+		int interval = beatsToMils(beats[grain]*2);
+		// Random notes for now
+		for (int i = 0; i < BEATS_PER_MEASURE / (beats[grain] * 2); i++) {
+			int p1 = pitch + scale[(int) random(0, scale.length)] - 24;
+			bass.addNote(p1, 80, interval);
+		}
+	}
+	else {
+		createRestMeasure(bass);
 	}
 }
 
