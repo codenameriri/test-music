@@ -41,7 +41,7 @@ int mils = millis();
 int lastMils = mils;
 
 // Music Stuff
-int[] scale = {0, 2, 4, 7, 9}; // I, II, III, V, VI
+int[] scale = {0, 2, 4, 7, 9}; // I, II, III, V, VI of a major scale
 int PITCH_C = 60;
 int PITCH_F = 65;
 int PITCH_G = 67;
@@ -152,7 +152,7 @@ void setupMusic() {
 	beat = 0;
 	measure = 0;
 	phase = 1;
-	setPhaseKey();
+	pitch = PITCH_C;
 	// Setup the instruments
 	createInstrumentsBeforePhase();
 	createKickMeasure();
@@ -594,7 +594,9 @@ void setMeasureBPM() {
 
 // Set the key for the next phase
 void setPhaseKey() {
+	/*
 	int p = phase - 1;
+	println(p);
 	if (p == 0 || p == PHASES_PER_SONG - 1) {
 		pitch = PITCH_C;
 	}
@@ -604,6 +606,19 @@ void setPhaseKey() {
 	else {
 		pitch = PITCH_G;
 	}
+	*/
+	int p = phase + 1;
+	println(p);
+	if (p == PHASES_PER_SONG - 2) {
+		pitch = PITCH_F;
+	}
+	else if (p == PHASES_PER_SONG - 1) {
+		pitch = PITCH_G;
+	}
+	else {
+		pitch = PITCH_C;
+	}
+	println(pitch);
 }
 
 // Save the focusRelaxLevel to the history
