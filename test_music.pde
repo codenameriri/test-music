@@ -65,6 +65,13 @@ RiriSequence bass; // Bass, Focus (and Relax?)
 RiriSequence arp; // Arpeggiator, Relax
 RiriSequence pad; // Pad, Relax 
 
+// MindFlex Serial things
+int MINDFLEX_PORT = 0;
+Serial mindFlex;
+PrintWriter output;
+int packetCount = 0;
+int START_PACKET = 3;
+
 /*
 *	Setup Sketch
 */
@@ -77,6 +84,16 @@ void setup() {
 	MidiBus.list();
 	mb = new MidiBus(this, -1, MIDI_PORT_OUT);
 	mb.sendTimestamps();
+	// MindFlex
+	println("Serial:");
+	for (int i = 0; i < Serial.list().length; i++) {
+	    println("[" + i + "] " + Serial.list()[i]);
+	}
+	mindFlex = new Serial(this, Serial.list()[MINDFLEX_PORT], 9600);
+	mindFlex.bufferUntil(10);
+	String date = day() + "_" + month() + "_" + year();
+  	String time = "" + hour() + minute() + second();
+	output = createWriter("brain_data/brain_data_out_"+date+"_"+time+".txt");
 }
 
 /*
@@ -106,6 +123,12 @@ void draw() {
 
 void keyPressed() {
 	switch (key) {
+		case 27: 
+			output.flush();
+			output.close();
+			stopMusic();
+			exit();
+			break;
 		case ' ':
 			if (!playing)
 				setupMusic();
@@ -218,15 +241,17 @@ void playMusic() {
 }
 
 void stopMusic() {
-	// Stop all instruments
-	kick.quit();
-	snare.quit();
-	hat.quit();
-	bass.quit();
-	arp.quit();
-	pad.quit();
-	// Stop playing the song
-	playing = false;
+	if (playing) {
+		// Stop all instruments
+		kick.quit();
+		snare.quit();
+		hat.quit();
+		bass.quit();
+		arp.quit();
+		pad.quit();
+		// Stop playing the song
+		playing = false;
+	}
 }
 
 void createMeasure() {
@@ -317,7 +342,7 @@ void createHatMeasure() {
 	int close = 42;
 	int open = 46;
 	// If Focus is active, play the Hat
-	if (level >= 0) {
+	if (level >= -19) {
 		// Hat - Grain 0
 		if (grain == 0) {
 			// Play a closed note every other measure
@@ -452,7 +477,7 @@ void createArpMeasure() {
 
 void createPadMeasure() {
 	// If Relax is active, play the pad
-	if (level <= 0) {
+	if (level <= 19) {
 		// Pad - Grain 0 and Grain 1
 		if (grain <= 1) {
 			int p1 = pitch - 12;
@@ -594,19 +619,6 @@ void setMeasureBPM() {
 
 // Set the key for the next phase
 void setPhaseKey() {
-	/*
-	int p = phase - 1;
-	println(p);
-	if (p == 0 || p == PHASES_PER_SONG - 1) {
-		pitch = PITCH_C;
-	}
-	else if (p == PHASES_PER_SONG - 2) {
-		pitch = PITCH_F;
-	}
-	else {
-		pitch = PITCH_G;
-	}
-	*/
 	int p = phase + 1;
 	println(p);
 	if (p == PHASES_PER_SONG - 2) {
@@ -645,3 +657,86 @@ void updateGrainHistory() {
 	grainHist.append(grain);
 }
 */
+
+/*
+*	MindFlex Input
+*/
+
+void serialEvent(Serial p) {
+	// Read in the data
+	boolean goodRead = false;
+	String input = p.readString().trim();
+	print("Received string over serial: ");
+	println(input);
+	output.println(input);
+
+	// Parse the data
+	if (input.indexOf("ERROR:") != -1 || input.length() == 0) {
+		println("bad");
+		goodRead = false;
+	}
+	else {
+		println("good");
+		goodRead = true;
+	}
+	if (goodRead) {
+		String[] brainData = input.split(",");
+		int[] intData = new int[brainData.length];
+		if (brainData.length > 8) {
+			packetCount++;
+			if (packetCount > START_PACKET) {
+				for (int i = 0; i < brainData.length; i++) {
+					String strVal = brainData[i].trim();
+					int intVal = Integer.parseInt(strVal);
+					// 0 THE DATA WHEN SIGNAL SUCKS
+					if ((Integer.parseInt(brainData[0]) == 200) && (i > 2)) {
+			          	intVal = 0;
+			        }
+			        intData[i] = intVal;
+				}
+			}
+		}
+
+		// Format the data
+		int min = -1; 
+		int max = -1;
+		for (int i = 3; i < intData.length; i++) {
+			if (max < 0 || intData[i] > max) {
+				max = intData[i];
+			}
+			if (min < 0 || intData[i] < min) {
+				min = intData[i];
+			}
+		}
+		println("MIN " + min + " MAX " + max);
+
+		int[] tmp = new int[intData.length - 3];
+		for (int i = 3; i < intData.length; i++) {
+			tmp[i-3] = (int) map(intData[i], min, max, 0, 100);
+		}
+
+		// Interpret the data
+		int focusVal = 0;
+		int relaxVal = 0;
+		float newLevel = 0;
+		for (int i = 0; i < tmp.length; i++) {
+			if (i < tmp.length/2) {
+				relaxVal += tmp[i];
+			}
+			else {
+				focusVal += tmp[i];
+			}
+		}
+		focusVal = (int) (focusVal / 4);
+		relaxVal = (int) (relaxVal / 4);
+
+		// Set the brain leven
+		newLevel = focusVal - relaxVal;
+		focusRelaxLevel = (int) newLevel;
+		//newLevel = map(focusVal - relaxVal, 0, 100, -100, 100);
+		println("NEW LEVEL: "+newLevel);
+	}
+	else {
+		// Do something
+	}
+}
