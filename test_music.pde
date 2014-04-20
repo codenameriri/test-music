@@ -407,6 +407,45 @@ void createArpMeasure() {
 				arp.addNote(p1, 80, interval);
 			} 
 		}
+
+		// Arp - Grain 1 or higher
+		else {
+			int arpNotes[];
+			int count = 0;
+			if (grain == 1) {
+				// Arpeggiate with I and V
+				int[] tmp = {pitch, pitch + scale[3]};
+				arpNotes = tmp;
+			}
+			else if (grain == 2) {
+				// Arpeggiate with I, III, and V
+				int [] tmp = {pitch, pitch + scale[2], pitch + scale[3], pitch + scale[2]};
+				arpNotes = tmp;
+			}
+			else {
+				// Arpeggiate with I, II, III, V, and VI
+				int [] tmp = {pitch, pitch + scale[1], pitch + scale[2], pitch + scale[3], pitch + scale[4], pitch + scale[3], pitch + scale[2], pitch + scale[1]};
+				arpNotes = tmp;
+			}
+			// RELIES ON 4/4 LOLOL
+			int loops = 2;
+			int howMany = (int) (BEATS_PER_MEASURE / beats[grain]);
+			int octave = 0;
+			//println(loops * howMany);
+			for (int i = 0; i < howMany; i++) {
+				arp.addNote(arpNotes[count] + octave, 80, interval);
+				if (count == arpNotes.length - 1) {
+					count = 0;
+					octave = (octave == 12) ? 0 : 12;
+				}
+				else {
+					count++;
+				}
+			}
+		}
+
+		/*
+		// BORING UPS ONLY FOOLS
 		// Arp - Grain 1 or higher
 		else {
 			int[] arpNotes;
@@ -432,8 +471,10 @@ void createArpMeasure() {
 				count = (count == arpNotes.length -1) ? 0 : count + 1;
 			}
 		}
+		*/
 
 		/*
+		// GO RANDO
 		// Arp - Grain 0
 		if (grain == 0) {
 			// Random notes
