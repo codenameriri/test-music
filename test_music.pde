@@ -2,6 +2,7 @@ import themidibus.*;
 import processing.serial.*;
 import org.firmata.*;
 import cc.arduino.*;
+import java.util.Map;
 
 /*
 *	Variables
@@ -71,6 +72,12 @@ Serial mindFlex;
 PrintWriter output;
 int packetCount = 0;
 int START_PACKET = 3;
+int globalMax = 0;
+
+// DataGen Properties
+HashMap<String,Integer> inputSettings = new HashMap<String,Integer>();
+DataGenerator dummyDataGenerator;
+boolean useDummyData = false;
 
 /*
 *	Setup Sketch
@@ -89,11 +96,19 @@ void setup() {
 	for (int i = 0; i < Serial.list().length; i++) {
 	    println("[" + i + "] " + Serial.list()[i]);
 	}
-	mindFlex = new Serial(this, Serial.list()[MINDFLEX_PORT], 9600);
-	mindFlex.bufferUntil(10);
-	String date = day() + "_" + month() + "_" + year();
-  	String time = "" + hour() + minute() + second();
-	output = createWriter("brain_data/brain_data_out_"+date+"_"+time+".txt");
+	try {
+		mindFlex = new Serial(this, Serial.list()[MINDFLEX_PORT], 9600);
+		mindFlex.bufferUntil(10);
+		String date = day() + "_" + month() + "_" + year();
+  		String time = "" + hour() + minute() + second();
+		output = createWriter("brain_data/brain_data_out_"+date+"_"+time+".txt");
+	}
+	catch (Exception e) {
+		useDummyData = true;
+	}
+	// DataGen
+	inputSettings.put("brainwave", 1000);
+	dummyDataGenerator = new DataGenerator(inputSettings);
 }
 
 /*
@@ -230,6 +245,10 @@ void playMusic() {
 			setMeasureGrain();
 			setMeasureBPM();
 			createMeasure();
+			if (useDummyData) {
+				String input = dummyDataGenerator.getInput("brainwave");
+				calculateFocusRelaxLevel(input);
+			}
 			beat++;
 		}
 		else {
@@ -664,13 +683,23 @@ void updateGrainHistory() {
 
 void serialEvent(Serial p) {
 	// Read in the data
-	boolean goodRead = false;
-	String input = p.readString().trim();
-	print("Received string over serial: ");
-	println(input);
-	output.println(input);
+	String input;
+	try {
+		input = p.readString().trim();
+		print("Received string over serial: ");
+		println(input);
+		output.println(input);
+	}
+	catch (Exception e) {
+		input = dummyDataGenerator.getInput("brainwave");
+		useDummyData = true;
+	}
+	calculateFocusRelaxLevel(input);
+}
 
+void calculateFocusRelaxLevel(String input) {
 	// Parse the data
+	boolean goodRead = false;
 	if (input.indexOf("ERROR:") != -1 || input.length() == 0) {
 		println("bad");
 		goodRead = false;
@@ -703,6 +732,9 @@ void serialEvent(Serial p) {
 		for (int i = 3; i < intData.length; i++) {
 			if (max < 0 || intData[i] > max) {
 				max = intData[i];
+				if (max > globalMax) {
+					globalMax = max;
+				}
 			}
 			if (min < 0 || intData[i] < min) {
 				min = intData[i];
@@ -712,14 +744,15 @@ void serialEvent(Serial p) {
 
 		int[] tmp = new int[intData.length - 3];
 		for (int i = 3; i < intData.length; i++) {
-			tmp[i-3] = (int) map(intData[i], min, max, 0, 100);
+			//tmp[i-3] = (int) map(intData[i], min, max, 0, 100);
+			tmp[i-3] = (int) map(intData[i], 0, globalMax, 0, 100);
 		}
 
 		// Interpret the data
 		int focusVal = 0;
 		int relaxVal = 0;
 		float newLevel = 0;
-		for (int i = 0; i < tmp.length; i++) {
+		for (int i = 1; i < tmp.length; i++) {
 			if (i < tmp.length/2) {
 				relaxVal += tmp[i];
 			}
@@ -730,9 +763,17 @@ void serialEvent(Serial p) {
 		focusVal = (int) (focusVal / 4);
 		relaxVal = (int) (relaxVal / 4);
 
-		// Set the brain leven
+		// Set the brain level
 		newLevel = focusVal - relaxVal;
-		focusRelaxLevel = (int) newLevel;
+		// focusRelaxLevel = (int) newLevel;
+		//focusRelaxLevel += (int) (newLevel / 4);
+		focusRelaxLevel += (int) newLevel;
+		if (focusRelaxLevel > MAX_FOCUS) {
+			focusRelaxLevel = MAX_FOCUS;
+		}
+		else if (focusRelaxLevel < MAX_RELAX) {
+			focusRelaxLevel = MAX_RELAX;
+		}
 		//newLevel = map(focusVal - relaxVal, 0, 100, -100, 100);
 		println("NEW LEVEL: "+newLevel);
 	}
